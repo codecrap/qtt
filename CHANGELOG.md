@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Improve sine fitting (#762)
+- The 'dataset_labels' method can handle both DataSet's DataArray's (#771)
 
 ### Removed
 
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
+- Deprecated instrument adapters. Deprecated post-processing tools in qtt.measurements.post_processing (#777)
 ### Fixed
 
 ## \[1.2.3] - 22-3-2021
