@@ -5,8 +5,6 @@ import functools
 import importlib
 import inspect
 import logging
-from typing import Type, Optional, Tuple, Union
-import dateutil
 import os
 import pickle
 import platform
@@ -19,7 +17,10 @@ import warnings
 from collections import OrderedDict
 from functools import wraps
 from itertools import chain
+from typing import Any, Dict, Optional, Tuple, Type, Union
 
+import dateutil
+import imageio
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,11 +29,10 @@ import scipy.ndimage as ndimage
 from matplotlib.widgets import Button
 from qcodes.data.data_array import DataArray
 from qcodes.data.data_set import DataSet
-from qcodes.plots.qcmatplotlib import MatPlot
 
 import qtt.pgeometry
-from qtt.pgeometry import (mkdirc,  # import for backwards compatibility
-                           mpl2clipboard, tilefigs)
+from qtt.pgeometry import mkdirc  # import for backwards compatibility
+from qtt.pgeometry import mpl2clipboard
 
 NotGitRepositoryError: Type[Exception]
 
@@ -65,30 +65,29 @@ except BaseException:
 # %%
 
 class measure_time():
-        """ Create context manager that measures execution time and prints to stdout """
+    """ Create context manager that measures execution time and prints to stdout """
 
-        def __init__(self, message: Optional[str] = 'dt: '):
-            self.message = message
+    def __init__(self, message: Optional[str] = 'dt: '):
+        self.message = message
 
-        def __enter__(self):
-            self.start_time = time.perf_counter()
-            return self
+    def __enter__(self):
+        self.start_time = time.perf_counter()
+        return self
 
-        @property
-        def delta_time(self) -> float:
-            """ Return time spend in the context
+    @property
+    def delta_time(self) -> float:
+        """ Return time spend in the context
 
-            Returns:
-                Time in seconds
-            """
-            return self.dt
+        Returns:
+            Time in seconds
+        """
+        return self.dt
 
-        def __exit__(self, exc_type, exc_value, exc_traceback):
-            self.dt = time.perf_counter() - self.start_time
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.dt = time.perf_counter() - self.start_time
 
-            if self.message is not None:
-                print(f'{self.message} {self.dt:.3f} [s]')
-
+        if self.message is not None:
+            print(f'{self.message} {self.dt:.3f} [s]')
 
 
 @contextlib.contextmanager
@@ -127,7 +126,7 @@ def get_module_versions(modules, verbose=0):
         r (dict): dictionary with package names and version number for each given module.
 
     """
-    module_versions = dict()
+    module_versions = {}
     for module in modules:
         try:
             package = importlib.import_module(module)
@@ -136,7 +135,7 @@ def get_module_versions(modules, verbose=0):
         except ModuleNotFoundError:
             module_versions[module] = 'none'
         if verbose:
-            print('module {0} {1}'.format(package, version))
+            print(f'module {package} {version}')
     return module_versions
 
 
@@ -155,8 +154,8 @@ def get_git_versions(repos, get_dirty_status=False, verbose=0):
         r (dict): dictionary with repo names, head guid and (optionally) dirty status for each given repository.
 
     """
-    heads = dict()
-    dirty_stats = dict()
+    heads = {}
+    dirty_stats = {}
     for repo in repos:
         try:
             package = importlib.import_module(repo)
@@ -173,7 +172,7 @@ def get_git_versions(repos, get_dirty_status=False, verbose=0):
             if get_dirty_status:
                 dirty_stats[repo] = 'none'
         if verbose:
-            print('{0}: {1}'.format(repo, heads[repo]))
+            print(f'{repo}: {heads[repo]}')
     return heads, dirty_stats
 
 
@@ -202,12 +201,12 @@ def code_version(repository_names=None, package_names=None, get_dirty_status=Fal
 
     """
     _default_git_versions = ['qcodes', 'qtt', 'projects', 'pycqed']
-    _default_module_versions = ['numpy', 'scipy', 'qupulse', 'h5py', 'skimage']
+    _default_module_versions = ['numpy', 'scipy', 'qupulse', 'skimage']
     if not repository_names:
         repository_names = _default_git_versions
     if not package_names:
         package_names = _default_module_versions
-    result = dict()
+    result = {}
     repository_stats, dirty_stats = get_git_versions(repository_names, get_dirty_status, verbose)
     result['python'] = get_python_version(verbose)
     result['git'] = repository_stats
@@ -238,7 +237,7 @@ def deprecated(func):
         except BaseException:
             lineno = -1
         warnings.warn_explicit(
-            "Call to deprecated function {}.".format(func.__name__),
+            f"Call to deprecated function {func.__name__}.",
             category=UserWarning,
             filename=filename,
             lineno=lineno,
@@ -291,7 +290,7 @@ def rdeprecated(txt=None, expire=None):
 
             if expire is not None:
                 if expired:
-                    raise Exception("Call to deprecated function {}.{}".format(func.__name__, etxt))
+                    raise Exception(f"Call to deprecated function {func.__name__}.{etxt}")
                 else:
                     warnings.warn_explicit(
                         "Call to deprecated function {} (will expire on {}).{}".format(
@@ -302,7 +301,7 @@ def rdeprecated(txt=None, expire=None):
                     )
             else:
                 warnings.warn_explicit(
-                    "Call to deprecated function {}.{}".format(func.__name__, etxt),
+                    f"Call to deprecated function {func.__name__}.{etxt}",
                     category=UserWarning,
                     filename=filename,
                     lineno=lineno,
@@ -557,7 +556,6 @@ def scanTime(dd):
     return w
 
 
-
 # %%
 
 def showImage(im, extent=None, fig=None, title=None):
@@ -580,7 +578,6 @@ def showImage(im, extent=None, fig=None, title=None):
                 plt.gca().invert_xaxis()
         if title is not None:
             plt.title(title)
-
 
 
 # %% Tools from pgeometry
@@ -716,8 +713,8 @@ def set_ppt_slide_background(slide, color, verbose=0):
     ppt_color = _convert_rgb_color_to_integer(color)
     if verbose > 1:
         print('Setting PPT slide background color:')
-        print(' - Current color: {0}'.format(_covert_integer_to_rgb_color(fore_color.RGB)))
-        print(' - Setting to {0} -> {1}'.format(color, ppt_color))
+        print(f' - Current color: {_covert_integer_to_rgb_color(fore_color.RGB)}')
+        print(f' - Setting to {color} -> {ppt_color}')
 
     slide.FollowMasterBackground = 0
     fore_color.RGB = ppt_color
@@ -752,11 +749,13 @@ def _ppt_determine_image_position(ppt, figsize, fname, verbose=1):
                 print(' image aspect ratio %.2f, slide aspect ratio %.2f' % (imratio, slideratio))
             if slideratio > imratio:
                 # wide slide, so make the image width smaller
-                print('adjust width %d->%d' % (width, height * imratio))
+                if verbose >= 2:
+                    print('adjust width %d->%d' % (width, height * imratio))
                 width = height * imratio
             else:
                 # wide image, so make the image height smaller
-                print('adjust height %d->%d' % (height, width / imratio))
+                if verbose >= 2:
+                    print('adjust height %d->%d' % (height, width / imratio))
                 height = int(width / imratio)
 
         if verbose:
@@ -765,9 +764,9 @@ def _ppt_determine_image_position(ppt, figsize, fname, verbose=1):
     return left, top, width, height
 
 
-def create_figure_ppt_callback(fig : Optional[int] = None, title : Optional[str] = None,
-                       notes : Optional[Union[str, DataSet]]=None,
-                       position : Tuple[float, float, float, float] = (0.9, 0.925, 0.075, 0.05)) -> None:
+def create_figure_ppt_callback(fig: Optional[int] = None, title: Optional[str] = None,
+                               notes: Optional[Union[str, DataSet]] = None,
+                               position: Tuple[float, float, float, float] = (0.9, 0.925, 0.075, 0.05)) -> None:
     """ Create a button on a matplotlib figure to copy data to PowerPoint slide.
 
     The figure is copied to PowerPoint using @ref addPPTslide.
@@ -807,10 +806,41 @@ try:
     import win32com
     import win32com.client
 
-    def addPPTslide(title=None, fig=None, txt=None, notes=None, figsize=None,
-                    subtitle=None, maintext=None, show=False, verbose=1,
-                    activate_slide=True, ppLayout=None, extranotes=None, background_color=None,
-                    maximum_notes_size: int = 10000):
+    def generate_powerpoint_notes(notes: Optional[Union[str, qcodes.Station, DataSet]], extranotes: Optional[str], maximum_notes_size: int):
+        """ Generate text to be added as notes to a PPT slide """
+        if notes is None:
+            warnings.warn(
+                'please set notes for the powerpoint slide. e.g. use the station or reshape_metadata')
+
+        if isinstance(notes, qcodes.Station):
+            station = notes
+            gates = getattr(station, 'gates', None)
+            notes = reshape_metadata(station, printformat='s', add_scanjob=True)
+            if extranotes is None:
+                pass
+            else:
+                notes = '\n' + extranotes + '\n' + notes  # type: ignore
+            if gates is not None:
+                notes = 'gates: ' + str(gates.allvalues()) + '\n\n' + notes  # type: ignore
+        elif isinstance(notes, DataSet):
+            notes = reshape_metadata(notes, printformat='s', add_gates=True)
+
+        if not isinstance(notes, str):
+            warnings.warn(f'type of notes argument is {type(notes)}, converting to string')
+            notes = str(notes)
+
+        if notes == '':
+            notes = ' '
+        if len(notes) > maximum_notes_size:
+            warnings.warn(f'notes for powerpoint are {len(notes)} characters, reducing to {maximum_notes_size}')
+            notes = notes[:maximum_notes_size]
+        return notes
+
+    def addPPTslide(title: Optional[str] = None, fig: Optional[Union[int, np.ndarray, plt.Figure, Any]] = None, txt: Optional[str] = None,
+                    notes: Optional[Union[str, qcodes.Station]] = None, figsize: Tuple[int, int] = None,
+                    subtitle: Optional[str] = None, maintext: Optional[str] = None, show: bool = False, verbose: int = 1,
+                    activate_slide: bool = True, ppLayout: int = None, extranotes: str = None, background_color: Optional[Tuple] = None,
+                    maximum_notes_size: int = 10000) -> Tuple[Any, Any]:
         """ Add slide to current active Powerpoint presentation.
 
         Arguments:
@@ -818,21 +848,20 @@ try:
             fig (matplotlib.figure.Figure or qcodes.plots.pyqtgraph.QtPlot or integer):
                 figure added to slide.
             txt (str) : Deprecated, use subtitle instead.
-            notes (str or QCoDeS station): notes added to slide.
-            figsize (list): size (width,height) of figurebox to add to powerpoint.
-            subtitle (str): text added to slide as subtitle.
-            maintext (str): text in textbox added to slide.
-            show (bool): shows the powerpoint application.
-            verbose (int): print additional information.
-            activate_slide (bool): activate the current slide.
-            ppLayout (int): layout of PP-slide (TitleOnly = 11, Text = 2).
-            extranotes (str): notes for slide.
-            background_color (None or tuple): background color for the slide.
+            notes: notes added to slide.
+            figsize: size (width,height) of figurebox to add to powerpoint.
+            subtitle : text added to slide as subtitle.
+            maintext: text in textbox added to slide.
+            show : shows the powerpoint application.
+            verbose: print additional information.
+            activate_slide: activate the current slide.
+            ppLayout: layout of PP-slide (TitleOnly = 11, Text = 2).
+            extranotes: notes for slide.
+            background_color: background color for the slide.
             maximum_notes_size: Maximum size of the notes in number of characters
 
         Returns:
-            ppt: PowerPoint presentation.
-            slide: PowerPoint slide.
+            Tuple of the PowerPoint presentation and PowerPoint slide.
 
         The interface to Powerpoint used is described here:
             https://msdn.microsoft.com/en-us/library/office/ff743968.aspx
@@ -856,7 +885,7 @@ try:
             try:
                 ppt = Application.Presentations.Add()
             except Exception as ex:
-                warnings.warn('Could not make connection to Powerpoint presentation.')
+                warnings.warn(f'Could not make connection to Powerpoint presentation. {ex}')
                 return None, None
 
         if show:
@@ -908,13 +937,11 @@ try:
             set_ppt_slide_background(slide, background_color, verbose=verbose)
 
         if fig is None:
-            titlebox = slide.shapes.Item(1)
             mainbox = slide.shapes.Item(2)
             if maintext is None:
                 raise TypeError('maintext argument is None')
             mainbox.TextFrame.TextRange.Text = maintext
         else:
-            titlebox = slide.shapes.Item(1)
             mainbox = None
             if maintext is not None:
                 warnings.warn('maintext not implemented when figure is set')
@@ -924,10 +951,12 @@ try:
         else:
             slide.shapes.title.textframe.textrange.text = 'QCoDeS measurement'
 
-        from qtt.measurements.videomode import VideoMode  # import here, to prevent default imports of gui code
+        from qtt.measurements.videomode import \
+            VideoMode  # import here, to prevent default imports of gui code
 
-        if fig is not None:
-            fname = tempfile.mktemp(prefix='qcodesimageitem', suffix='.png')
+        def add_figure_to_slide(fig, slide, figsize, verbose):
+            """ Add figure to PPT slide """
+            fname = tempfile.mktemp(prefix='qcodesimageitem-', suffix='.png')
             if isinstance(fig, matplotlib.figure.Figure):
                 fig.savefig(fname)
             elif isinstance(fig, int):
@@ -966,17 +995,21 @@ try:
                 figtemp.save(fname)
             elif isinstance(fig, qcodes.plots.pyqtgraph.QtPlot):
                 fig.save(fname)
+            elif isinstance(fig, np.ndarray):
+                imageio.imwrite(fname, fig)
+            elif isinstance(fig, str) and fig.endswith('.png'):
+                fname = fig
             else:
                 if verbose:
                     raise TypeError('figure is of an unknown type %s' % (type(fig),))
-            top = 120
+            slide_margin_left, slide_margin_top, width, height = _ppt_determine_image_position(
+                ppt, figsize, fname, verbose=verbose >= 2)
 
-            left, top, width, height = _ppt_determine_image_position(ppt, figsize, fname, verbose=verbose>=2)
-
-            if verbose >= 2:
-                print('fname %s' % fname)
             slide.Shapes.AddPicture(FileName=fname, LinkToFile=False,
-                                    SaveWithDocument=True, Left=left, Top=top, Width=width, Height=height)
+                                    SaveWithDocument=True, Left=slide_margin_left, Top=slide_margin_top, Width=width, Height=height)
+
+        if fig is not None:
+            add_figure_to_slide(fig, slide, figsize, verbose)
 
         if subtitle is not None:
             # add subtitle
@@ -985,34 +1018,9 @@ try:
             subtitlebox.Name = 'subtitle box'
             subtitlebox.TextFrame.TextRange.Text = subtitle
 
-        if notes is None:
-            warnings.warn(
-                'please set notes for the powerpoint slide. e.g. use the station or reshape_metadata')
-
-        if isinstance(notes, qcodes.Station):
-            station = notes
-            gates = getattr(station, 'gates', None)
-            notes = reshape_metadata(station, printformat='s', add_scanjob=True)
-            if extranotes is not None:
-                notes = '\n' + extranotes + '\n' + notes
-            if gates is not None:
-                notes = 'gates: ' + str(gates.allvalues()) + '\n\n' + notes
-        elif isinstance(notes, DataSet):
-            notes = reshape_metadata(notes, printformat='s', add_gates=True)
-
-        if not isinstance(notes, str):
-            warnings.warn(f'type of notes argument is {type(notes)}, converting to string')
-            notes = str(notes)
-
-        if notes is not None:
-            if notes == '':
-                notes = ' '
-            if len(notes) > maximum_notes_size:
-                warnings.warn(f'notes for powerpoint are {len(notes)} characters, reducing to {maximum_notes_size}')
-                notes = notes[:maximum_notes_size]
-
-            slide.notespage.shapes.placeholders[
-                2].textframe.textrange.insertafter(notes)
+        notes_text = generate_powerpoint_notes(notes, extranotes, maximum_notes_size)
+        slide.notespage.shapes.placeholders[
+            2].textframe.textrange.insertafter(notes_text)
 
         if activate_slide:
             idx = int(slide.SlideIndex)
@@ -1095,16 +1103,18 @@ try:
         return ppt, slide
 
 except ImportError:
-    def addPPTslide(title=None, fig=None, txt=None, notes=None, figsize=None,
-                    subtitle=None, maintext=None, show=False, verbose=1,
-                    activate_slide=True, ppLayout=None, extranotes=None, background_color=None,
-                    maximum_notes_size: int = 10000):
+    def addPPTslide(title: Optional[str] = None, fig: Optional[Union[int, np.ndarray, plt.Figure, Any]] = None, txt: Optional[str] = None,
+                    notes: Optional[Union[str, qcodes.Station]] = None, figsize: Tuple[int, int] = None,
+                    subtitle: Optional[str] = None, maintext: Optional[str] = None, show: bool = False, verbose: int = 1,
+                    activate_slide: bool = True, ppLayout: int = None, extranotes: str = None, background_color: Optional[Tuple] = None,
+                    maximum_notes_size: int = 10000) -> Tuple[Any, Any]:
         """ Add slide to current active Powerpoint presentation.
 
         Dummy implementation.
         """
         warnings.warn(
             'addPPTslide is not available on your system. Install win32com from https://pypi.org/project/pypiwin32/.')
+        return None, None
 
     def addPPT_dataset(dataset, title=None, notes=None,
                        show=False, verbose=1, paramname='measured',
@@ -1120,7 +1130,7 @@ except ImportError:
 # %%
 
 
-def reshape_metadata(dataset, printformat='dict', add_scanjob=True, add_gates=True, add_analysis_results=True, verbose=0):
+def reshape_metadata(dataset, printformat='dict', add_scanjob=True, add_gates=True, add_analysis_results=True, verbose=0) -> str:
     """ Reshape the metadata of a DataSet.
 
     Args:
@@ -1132,13 +1142,13 @@ def reshape_metadata(dataset, printformat='dict', add_scanjob=True, add_gates=Tr
         verbose (int): verbosity (0 == silent).
 
     Returns:
-        str: the reshaped metadata.
+        The reshaped metadata.
 
     """
     if isinstance(dataset, qcodes.Station):
         station = dataset
         all_md = station.snapshot(update=False)['instruments']
-        header = None
+        header = ''
     else:
         tmp = dataset.metadata.get('station', None)
         if tmp is None:
@@ -1155,7 +1165,7 @@ def reshape_metadata(dataset, printformat='dict', add_scanjob=True, add_gates=Tr
         gate_values = dataset.metadata.get('allgatevalues', None)
 
         if gate_values is not None:
-            gate_values = dict([(key, np.around(value, 3)) for key, value in gate_values.items()])
+            gate_values = {key: np.around(value, 3) for key, value in gate_values.items()}
             header += '\ngates: ' + str(gate_values) + '\n'
 
     scanjob = dataset.metadata.get('scanjob', None)
@@ -1168,11 +1178,11 @@ def reshape_metadata(dataset, printformat='dict', add_scanjob=True, add_gates=Tr
         s = pprint.pformat(analysis_results)
         header += '\n\analysis_results: ' + str(s) + '\n'
 
-    metadata = OrderedDict()
+    metadata: Dict[Any, Dict] = {}
     # make sure the gates instrument is in front
     all_md_keys = sorted(sorted(all_md), key=lambda x: x == 'gates', reverse=True)
     for x in all_md_keys:
-        metadata[x] = OrderedDict()
+        metadata[x] = {}
         if 'IDN' in all_md[x]['parameters']:
             metadata[x]['IDN'] = dict({'name': 'IDN', 'value': all_md[
                 x]['parameters']['IDN']['value']})
@@ -1180,7 +1190,7 @@ def reshape_metadata(dataset, printformat='dict', add_scanjob=True, add_gates=Tr
         for y in sorted(all_md[x]['parameters'].keys()):
             try:
                 if y != 'IDN':
-                    metadata[x][y] = OrderedDict()
+                    metadata[x][y] = {}
                     param_md = all_md[x]['parameters'][y]
                     metadata[x][y]['name'] = y
                     if isinstance(param_md['value'], (float, np.float64)):
@@ -1202,14 +1212,13 @@ def reshape_metadata(dataset, printformat='dict', add_scanjob=True, add_gates=Tr
         for k in metadata:
             if verbose:
                 print('--- %s' % k)
-            s = metadata[k]
+            element = metadata[k]
             ss += '\n## %s:\n' % k
-            for p in s:
-                pp = s[p]
+            for parameter in element:
+                pp = element[parameter]
                 if verbose:
-                    print('  --- %s: %s' % (p, pp.get('value', '??')))
-                ss += '%s: %s (%s)' % (pp['name'],
-                                       pp.get('value', '?'), pp.get('unit', ''))
+                    print('  --- %s: %s' % (parameter, pp.get('value', '??')))
+                ss += '%s: %s (%s)' % (pp['name'], pp.get('value', '?'), pp.get('unit', ''))
                 ss += '\n'
 
     if header is not None:
@@ -1227,7 +1236,6 @@ def updatePlotTitle(qplot, basetxt='Live plot'):
     """ Update the plot title of a QtPlot window."""
     txt = basetxt + ' (%s)' % time.asctime()
     qplot.win.setWindowTitle(txt)
-
 
 
 # %%
@@ -1281,7 +1289,7 @@ def smoothFourierFilter(fs=100, thr=6, omega=2, fig=None):
     >>> F=smoothFourierFilter([24,24], thr=6, omega=2)
     >>> _=plt.figure(10); plt.clf(); _=plt.imshow(F, interpolation='nearest')
     """
-    rr = np.meshgrid(*[range(f) for f in fs])
+    rr = np.meshgrid(*(range(f) for f in fs))
 
     x = np.dstack(rr)
     x = x - (np.array(fs) / 2 - .5)
