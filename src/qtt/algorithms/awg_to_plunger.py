@@ -4,19 +4,20 @@ pieter.eendebak@tno.nl
 
 """
 
+import copy
+
+import matplotlib.pyplot as plt
 # %% Load packages
 import numpy as np
-import qtt.pgeometry
 import qcodes
-import copy
-import matplotlib.pyplot as plt
-
 from qcodes.plots.qcmatplotlib import MatPlot
+
 import qtt.algorithms.images
+import qtt.pgeometry
 import qtt.utilities.imagetools
+from qtt.algorithms.images import straightenImage
 from qtt.measurements.scans import scan2Dfast, scanjob_t
 from qtt.utilities.imagetools import cleanSensingImage
-from qtt.algorithms.images import straightenImage
 
 # %% Helper functions
 
@@ -40,7 +41,7 @@ def get_dataset(ds):
     return ds
 
 
-def click_line(fig=None):
+def click_line(fig=None, show_points=False):
     """ Define a line through two points. The points are choosen by clicking on a position in a plot, two times.
 
     Args:
@@ -58,6 +59,9 @@ def click_line(fig=None):
     slope = (pts1[1] - pts0[1]) / (pts1[0] - pts0[0])
     offset = (pts0[1] - slope * pts0[0])
 
+    pts = np.array([pts0, pts1]).T
+    if show_points:
+        plt.plot(pts[0], pts[1], '.-g')
     return offset, slope
 
 # %% Main functions
@@ -152,7 +156,7 @@ def analyse_awg_to_plunger(result, method='hough', fig=None):
             correction = None
         else:
             angles = lines[:, 0, 1]
-            angle_pixel = angles[0] # take most voted line
+            angle_pixel = angles[0]  # take most voted line
 
             fac = 2
             xpix = np.array([[0, 0], [-fac * np.sin(angle_pixel), fac * np.cos(angle_pixel)]]).T
